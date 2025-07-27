@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on Wed May 19 10:49:20 2021
+Formatted for GitHub on 7/27/25
 
 @author: Andrew Anderson
 """
@@ -40,38 +41,38 @@ DIFFICULTIES = {
 
 #==============================================================================
 
-Corner_image = pygame.image.load("corner.png")
-CornerFlip_image = pygame.image.load("cornerFlip.png")
-Square_image = pygame.image.load('square.png')
-Zero_image = pygame.image.load('NOsquare.png')
-Flag_image = pygame.image.load('flag.png')
-Wrong_image = pygame.image.load('wrong.png')
-Mine_image = pygame.image.load('mine.png')
-Explode_image = pygame.image.load('explode.png')
-Happy_image = pygame.image.load('happy.png')
-HappyClick_image = pygame.image.load('happyClick.png')
-Sad_image = pygame.image.load('sad.png')
-Click_image = pygame.image.load('clicking.png')
-Settings_image = pygame.image.load('settings.png')
-SettingsClick_image = pygame.image.load('settingsClick.png')
-Menu_image = pygame.image.load('menu.png')
-B1_image = pygame.image.load('b1.png')
-B1click_image = pygame.image.load('b1click.png')
-B2_image = pygame.image.load('b2.png')
-B3_image = pygame.image.load('b3.png')
-I1_image = pygame.image.load('i1.png')
-I2_image = pygame.image.load('i2.png')
-E_image = pygame.image.load('expert.png')
-Won_image = pygame.image.load('won.png')
-Zero_image = pygame.image.load('NOsquare.png')
-One_image = pygame.image.load('one.png')
-Two_image = pygame.image.load('two.png')
-Three_image = pygame.image.load('three.png')
-Four_image = pygame.image.load('four.png')
-Five_image = pygame.image.load('five.png')
-Six_image = pygame.image.load('six.png')
-Seven_image = pygame.image.load('seven.png')
-Eight_image = pygame.image.load('eight.png')
+Corner_image = pygame.image.load("assets/corner.png")
+CornerFlip_image = pygame.image.load("assets/cornerFlip.png")
+Square_image = pygame.image.load('assets/square.png')
+Zero_image = pygame.image.load('assets/NOsquare.png')
+Flag_image = pygame.image.load('assets/flag.png')
+Wrong_image = pygame.image.load('assets/wrong.png')
+Mine_image = pygame.image.load('assets/mine.png')
+Explode_image = pygame.image.load('assets/explode.png')
+Happy_image = pygame.image.load('assets/happy.png')
+HappyClick_image = pygame.image.load('assets/happyClick.png')
+Sad_image = pygame.image.load('assets/sad.png')
+Click_image = pygame.image.load('assets/clicking.png')
+Settings_image = pygame.image.load('assets/settings.png')
+SettingsClick_image = pygame.image.load('assets/settingsClick.png')
+Menu_image = pygame.image.load('assets/menu.png')
+B1_image = pygame.image.load('assets/b1.png')
+B1click_image = pygame.image.load('assets/b1click.png')
+B2_image = pygame.image.load('assets/b2.png')
+B3_image = pygame.image.load('assets/b3.png')
+I1_image = pygame.image.load('assets/i1.png')
+I2_image = pygame.image.load('assets/i2.png')
+E_image = pygame.image.load('assets/expert.png')
+Won_image = pygame.image.load('assets/won.png')
+Zero_image = pygame.image.load('assets/NOsquare.png')
+One_image = pygame.image.load('assets/one.png')
+Two_image = pygame.image.load('assets/two.png')
+Three_image = pygame.image.load('assets/three.png')
+Four_image = pygame.image.load('assets/four.png')
+Five_image = pygame.image.load('assets/five.png')
+Six_image = pygame.image.load('assets/six.png')
+Seven_image = pygame.image.load('assets/seven.png')
+Eight_image = pygame.image.load('assets/eight.png')
 
 #==============================================================================
 
