@@ -44,12 +44,14 @@ python minesweeper.py
 ```python
 # Grid supports multiple difficulty configurations
 DIFFICULTIES = {
-    1: [240,240,10],   # Beginner: 8x8, 10 mines
-    2: [300,300,10],   # Intermediate
-    3: [360,360,15],   # Advanced
-    4: [480,480,40],   # Expert
-    # ... custom difficulties
-}
+    1:[240,240,10], #beginner 1
+    2:[300,300,10], #beginner 2
+    3:[360,360,15], #beginner 3
+    4:[480,480,40], #intermediate 1
+    5:[540,540,60], #intermediate 2
+    6:[900,480,99], #expert
+    7:[1800,900,375], #extreme 
+    8:[810,420,50]}  #test
 ```
 
 **Smart Algorithms**:
