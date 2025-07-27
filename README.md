@@ -23,8 +23,8 @@ pip install pygame
 
 ### Installation & Running
 ```bash
-git clone https://github.com/yourusername/minesweeper-pygame
-cd minesweeper-pygame
+git clone https://github.com/drewizcool/Minesweeper.git
+cd Minesweeper
 python minesweeper.py
 ```
 
