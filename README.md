@@ -2,8 +2,7 @@
 
 A Minesweeper implementation built with Python and Pygame, featuring multiple difficulty levels, intuitive gameplay, and a classic Windows-style interface.
 
-![Minesweeper Gameplay](screenshots/gameplay.gif)
-*[Add a GIF or screenshot of your game in action]*
+![Minesweeper Gameplay](screenshots/GameplayScreenshot.PNG)
 
 ## 🎮 Features
 
