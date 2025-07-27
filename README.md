@@ -76,7 +76,7 @@ DIFFICULTIES = {
 ## 📁 Project Structure
 
 ```
-minesweeper-pygame/
+Minesweeper/
 ├── minesweeper.py          # Main game logic and entry point
 ├── assets/                 # Game sprites and images
 │   ├── mine.png
@@ -95,19 +95,11 @@ Built as a comprehensive software development project demonstrating:
 - **Game State Management**: Robust handling of complex game states
 - **Code Organization**: Modular, maintainable code structure
 
-## 📝 License
 
-This project is open source and available under the [MIT License](LICENSE).
-
-## 🤝 Contributing
-
-Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](../../issues).
-
----
 
 **Author**: Andrew Anderson  
 **Created**: May 2021  
 **Language**: Python 3.x  
 **Framework**: Pygame
 
-*This project demonstrates proficiency in Python programming, game development, algorithm implementation, and software testing practices.*
+*This project demonstrates proficiency in Python programming, game development and algorithm implementation.*
