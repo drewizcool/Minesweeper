@@ -6,8 +6,11 @@ Formatted for GitHub on 7/27/25
 @author: Andrew Anderson
 """
 
+import os
 import pygame
 import random
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 pygame.init()
 pygame.display.set_caption('Minesweeper')
@@ -41,38 +44,38 @@ DIFFICULTIES = {
 
 #==============================================================================
 
-Corner_image = pygame.image.load("assets/corner.png")
-CornerFlip_image = pygame.image.load("assets/cornerFlip.png")
-Square_image = pygame.image.load('assets/square.png')
-Zero_image = pygame.image.load('assets/NOsquare.png')
-Flag_image = pygame.image.load('assets/flag.png')
-Wrong_image = pygame.image.load('assets/wrong.png')
-Mine_image = pygame.image.load('assets/mine.png')
-Explode_image = pygame.image.load('assets/explode.png')
-Happy_image = pygame.image.load('assets/happy.png')
-HappyClick_image = pygame.image.load('assets/happyClick.png')
-Sad_image = pygame.image.load('assets/sad.png')
-Click_image = pygame.image.load('assets/clicking.png')
-Settings_image = pygame.image.load('assets/settings.png')
-SettingsClick_image = pygame.image.load('assets/settingsClick.png')
-Menu_image = pygame.image.load('assets/menu.png')
-B1_image = pygame.image.load('assets/b1.png')
-B1click_image = pygame.image.load('assets/b1click.png')
-B2_image = pygame.image.load('assets/b2.png')
-B3_image = pygame.image.load('assets/b3.png')
-I1_image = pygame.image.load('assets/i1.png')
-I2_image = pygame.image.load('assets/i2.png')
-E_image = pygame.image.load('assets/expert.png')
-Won_image = pygame.image.load('assets/won.png')
-Zero_image = pygame.image.load('assets/NOsquare.png')
-One_image = pygame.image.load('assets/one.png')
-Two_image = pygame.image.load('assets/two.png')
-Three_image = pygame.image.load('assets/three.png')
-Four_image = pygame.image.load('assets/four.png')
-Five_image = pygame.image.load('assets/five.png')
-Six_image = pygame.image.load('assets/six.png')
-Seven_image = pygame.image.load('assets/seven.png')
-Eight_image = pygame.image.load('assets/eight.png')
+Corner_image = pygame.image.load(os.path.join(BASE_DIR, "assets/corner.png"))
+CornerFlip_image = pygame.image.load(os.path.join(BASE_DIR, "assets/cornerFlip.png"))
+Square_image = pygame.image.load(os.path.join(BASE_DIR, "assets/square.png"))
+Zero_image = pygame.image.load(os.path.join(BASE_DIR, "assets/NOsquare.png"))
+Flag_image = pygame.image.load(os.path.join(BASE_DIR, "assets/flag.png"))
+Wrong_image = pygame.image.load(os.path.join(BASE_DIR, "assets/wrong.png"))
+Mine_image = pygame.image.load(os.path.join(BASE_DIR, "assets/mine.png"))
+Explode_image = pygame.image.load(os.path.join(BASE_DIR, "assets/explode.png"))
+Happy_image = pygame.image.load(os.path.join(BASE_DIR, "assets/happy.png"))
+HappyClick_image = pygame.image.load(os.path.join(BASE_DIR, "assets/happyClick.png"))
+Sad_image = pygame.image.load(os.path.join(BASE_DIR, "assets/sad.png"))
+Click_image = pygame.image.load(os.path.join(BASE_DIR, "assets/clicking.png"))
+Settings_image = pygame.image.load(os.path.join(BASE_DIR, "assets/settings.png"))
+SettingsClick_image = pygame.image.load(os.path.join(BASE_DIR, "assets/settingsClick.png"))
+Menu_image = pygame.image.load(os.path.join(BASE_DIR, "assets/menu.png"))
+B1_image = pygame.image.load(os.path.join(BASE_DIR, "assets/b1.png"))
+B1click_image = pygame.image.load(os.path.join(BASE_DIR, "assets/b1click.png"))
+B2_image = pygame.image.load(os.path.join(BASE_DIR, "assets/b2.png"))
+B3_image = pygame.image.load(os.path.join(BASE_DIR, "assets/b3.png"))
+I1_image = pygame.image.load(os.path.join(BASE_DIR, "assets/i1.png"))
+I2_image = pygame.image.load(os.path.join(BASE_DIR, "assets/i2.png"))
+E_image = pygame.image.load(os.path.join(BASE_DIR, "assets/expert.png"))
+Won_image = pygame.image.load(os.path.join(BASE_DIR, "assets/won.png"))
+Zero_image = pygame.image.load(os.path.join(BASE_DIR, "assets/NOsquare.png"))
+One_image = pygame.image.load(os.path.join(BASE_DIR, "assets/one.png"))
+Two_image = pygame.image.load(os.path.join(BASE_DIR, "assets/two.png"))
+Three_image = pygame.image.load(os.path.join(BASE_DIR, "assets/three.png"))
+Four_image = pygame.image.load(os.path.join(BASE_DIR, "assets/four.png"))
+Five_image = pygame.image.load(os.path.join(BASE_DIR, "assets/five.png"))
+Six_image = pygame.image.load(os.path.join(BASE_DIR, "assets/six.png"))
+Seven_image = pygame.image.load(os.path.join(BASE_DIR, "assets/seven.png"))
+Eight_image = pygame.image.load(os.path.join(BASE_DIR, "assets/eight.png"))
 
 #==============================================================================
 
