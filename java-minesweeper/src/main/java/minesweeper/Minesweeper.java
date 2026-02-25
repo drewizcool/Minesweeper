@@ -1,98 +1,45 @@
 package minesweeper;
 
-import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 
-/**
- * Main class. Ports Python global state, global functions, and the main game loop.
- *
- * Threading: game loop runs on a background thread; Swing listeners push GameEvents
- * onto a LinkedBlockingQueue. The game thread calls queue.take() (blocking), which
- * mirrors pygame's event.get() pattern and allows the hold loops to work identically.
- */
 public class Minesweeper {
 
-    // Python: ORIGIN = (20, 60)
     public static final int ORIGIN_X = 20;
-    public static final int ORIGIN_Y = 60;
+    public static final int ORIGIN_Y = 90;
 
-    // -------------------------------------------------------------------------
-    // Images — loaded once at startup
-    // -------------------------------------------------------------------------
-    public static BufferedImage Corner_image;
-    public static BufferedImage CornerFlip_image;
-    public static BufferedImage Square_image;
-    public static BufferedImage Zero_image;
-    public static BufferedImage Flag_image;
-    public static BufferedImage Wrong_image;
-    public static BufferedImage Mine_image;
-    public static BufferedImage Explode_image;
-    public static BufferedImage Happy_image;
-    public static BufferedImage HappyClick_image;
-    public static BufferedImage Sad_image;
-    public static BufferedImage Click_image;
-    public static BufferedImage Settings_image;
-    public static BufferedImage SettingsClick_image;
-    public static BufferedImage Menu_image;
-    public static BufferedImage B1_image;
-    public static BufferedImage B1click_image;
-    public static BufferedImage B2_image;
-    public static BufferedImage B3_image;
-    public static BufferedImage I1_image;
-    public static BufferedImage I2_image;
-    public static BufferedImage E_image;
-    public static BufferedImage Won_image;
-    public static BufferedImage One_image;
-    public static BufferedImage Two_image;
-    public static BufferedImage Three_image;
-    public static BufferedImage Four_image;
-    public static BufferedImage Five_image;
-    public static BufferedImage Six_image;
-    public static BufferedImage Seven_image;
-    public static BufferedImage Eight_image;
+    public static ImageAssets images;
+    public static GameState state;
 
-    // -------------------------------------------------------------------------
-    // Global game state (Python globals)
-    // -------------------------------------------------------------------------
-    public static volatile Grid gameGrid;
     public static volatile Screen gameScreen;
     public static volatile SettingsMenu gameSettings;
-    public static volatile boolean playing;
-    public static volatile boolean generated;
-    public static volatile Square exploded;
-    public static volatile boolean win;
 
-    // -------------------------------------------------------------------------
-    // Event queue — replaces pygame.event.get()
-    // -------------------------------------------------------------------------
     public static final LinkedBlockingQueue<GameEvent> eventQueue = new LinkedBlockingQueue<>();
 
     private static JFrame frame;
+    private static JFrame hudFrame = null;
+    public  static volatile HudPanel hudPanel = null;
 
     // =========================================================================
     // main()
     // =========================================================================
 
     public static void main(String[] args) {
-        File baseDir = resolveBaseDir();
-        loadImages(baseDir);
+        images = new ImageAssets(ImageAssets.resolveBaseDir());
 
-        // Python: GameGrid = Grid(3); GameScreen = Screen(GameGrid); GameSettings = ...
-        gameGrid = new Grid(3);
+        Grid initialGrid = new Grid(3);
+        state = new GameState(initialGrid);
 
         SwingUtilities.invokeLater(() -> {
-            gameScreen = new Screen(gameGrid);
-            gameSettings = new SettingsMenu(gameGrid);
+            gameScreen = new Screen(state.grid, images, state.dungeonMode);
+            gameSettings = new SettingsMenu(state.grid, images);
 
             frame = new JFrame("Minesweeper");
-            frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
             frame.add(gameScreen);
             frame.pack();
             frame.setLocationRelativeTo(null);
@@ -108,25 +55,23 @@ public class Minesweeper {
     }
 
     // =========================================================================
-    // Game loop — direct port of Python "while run:" block
+    // Game loop
     // =========================================================================
 
     private static void gameLoop() {
-        // Python calls getCloseMines on all squares right after grid creation
-        // (before mines exist, so all values will be 0 — matches Python behavior)
-        initCloseMines();
+        GameLogic.initCloseMines(state.grid);
 
-        playing = true;
-        generated = false;
-        exploded = null;
-        win = false;
+        state.playing = true;
+        state.generated = false;
+        state.exploded = null;
+        state.win = false;
 
         boolean run = true;
 
         while (run) {
             GameEvent event;
             try {
-                event = eventQueue.take(); // blocks — mirrors pygame.event.get()
+                event = eventQueue.take();
             } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
                 break;
@@ -135,73 +80,111 @@ public class Minesweeper {
             if (event.type == GameEvent.EventType.QUIT) {
                 run = false;
 
-            } else if (event.type == GameEvent.EventType.KEY_PRESS
-                    && event.keyCode == KeyEvent.VK_F2) {
-                // Python: keys[pygame.K_F2] → reset same difficulty
-                rebuildGame(gameGrid.difficulty);
+            } else if (event.type == GameEvent.EventType.KEY_PRESS) {
+                if (event.keyCode == KeyEvent.VK_F2) {
+                    if (state.dungeonMode) {
+                        state.resetCurrentFloor();
+                        rebuildScreen();
+                        drawAll();
+                    } else {
+                        rebuildGame(state.grid.difficulty);
+                    }
+                } else if (event.keyCode == KeyEvent.VK_ESCAPE && state.dungeonMode && !state.dungeonStack.isEmpty()) {
+                    DungeonManager.exitDungeonFloor(state);
+                    rebuildScreen();
+                    drawAll();
+                }
 
             } else if (event.type == GameEvent.EventType.MOUSE_DOWN) {
                 int mx = event.x;
                 int my = event.y;
                 int btn = event.button;
-                int[] square = selectSquare(mx, my);
+                int[] square = state.grid.selectSquare(mx, my);
 
                 if (btn == 1) {
                     if (gameScreen.resetButton.contains(mx, my)) {
                         if (holdButton(gameScreen.resetButton)) {
-                            rebuildGame(gameGrid.difficulty);
+                            if (state.dungeonMode) {
+                                state.resetCurrentFloor();
+                                rebuildScreen();
+                                drawAll();
+                            } else {
+                                rebuildGame(state.grid.difficulty);
+                            }
                         }
 
                     } else if (gameScreen.settingsButton.contains(mx, my)) {
                         if (holdButton(gameScreen.settingsButton)) {
                             int setting = openSettings();
-                            if (setting != gameGrid.difficulty && setting != -1) {
+                            if (setting != state.grid.difficulty && setting != -1) {
                                 rebuildGame(setting);
                             }
                         }
 
-                    } else if (square != null && playing) {
-                        if (!generated) {
-                            gameGrid.setFirstSquare(square[0], square[1]);
-                            gameGrid.generateMines();
-                            initCloseMines();
-                            generated = true;
+                    } else if (state.dungeonMode && gameScreen.bagButton != null
+                            && gameScreen.bagButton.contains(mx, my)) {
+                        if (holdButton(gameScreen.bagButton)) {
+                            toggleHudWindow();
+                        }
+
+                    } else if (square != null && state.playing) {
+                        if (!state.generated) {
+                            state.grid.setFirstSquare(square[0], square[1]);
+                            state.grid.generateMines();
+                            GameLogic.initCloseMines(state.grid);
+                            if (state.dungeonMode) DungeonManager.placeDungeonStairs(state);
+                            state.generated = true;
                         }
                         List<int[]> adjacent = holdSquare(square);
                         if (adjacent != null) {
                             int[] sq0 = adjacent.get(0);
-                            boolean removed = removeSquare(sq0);
-                            if (removed) {
-                                if (gameGrid.matrix[sq0[0]][sq0[1]].mine) {
-                                    exploded = gameGrid.matrix[sq0[0]][sq0[1]];
-                                    playing = false;
-                                    win = false;
-                                    generated = false;
-                                } else if (gameGrid.numRemoved == gameGrid.numSquares - gameGrid.numMines) {
-                                    playing = false;
-                                    win = true;
+                            Square sqObj = state.grid.matrix[sq0[0]][sq0[1]];
+                            if (state.dungeonMode && sqObj.isKey && sqObj.removed && !sqObj.keyCollected) {
+                                sqObj.keyCollected = true;
+                                state.keysFound++;
+                            } else if (state.dungeonMode && sqObj.isStairs && sqObj.removed) {
+                                if (sqObj.stairUnlocked) {
+                                    DungeonManager.enterDungeonFloor(state, sq0[0], sq0[1]);
+                                    rebuildScreen();
+                                    drawAll();
+                                } else if (state.keysFound > 0) {
+                                    state.keysFound--;
+                                    sqObj.stairUnlocked = true;
+                                }
+                            } else {
+                                boolean removed = GameLogic.removeSquare(state.grid, sq0);
+                                if (removed) {
+                                    if (state.grid.matrix[sq0[0]][sq0[1]].mine) {
+                                        state.exploded = state.grid.matrix[sq0[0]][sq0[1]];
+                                        state.playing = false;
+                                        state.win = false;
+                                        state.generated = false;
+                                    } else if (state.checkWinCondition()) {
+                                        state.playing = false;
+                                        state.win = true;
+                                    }
                                 }
                             }
                         }
 
                     }
 
-                } else if (btn == 2 && playing) {
+                } else if (btn == 2 && state.playing) {
                     if (square != null) {
                         List<int[]> adjacent = holdAdjacent(square);
-                        if (adjacent != null && gameGrid.matrix[square[0]][square[1]].removed) {
-                            int close = getCloseFlags(square);
-                            if (close == gameGrid.matrix[square[0]][square[1]].closeMines && close > 0) {
+                        if (adjacent != null && state.grid.matrix[square[0]][square[1]].removed) {
+                            int close = GameLogic.getCloseFlags(state.grid, square[0], square[1]);
+                            if (close == state.grid.matrix[square[0]][square[1]].closeMines && close > 0) {
                                 for (int[] adj : adjacent) {
-                                    boolean removed = removeSquare(adj);
+                                    boolean removed = GameLogic.removeSquare(state.grid, adj);
                                     if (removed) {
-                                        if (gameGrid.matrix[adj[0]][adj[1]].mine) {
-                                            exploded = gameGrid.matrix[adj[0]][adj[1]];
-                                            playing = false;
-                                            win = false;
-                                        } else if (gameGrid.numRemoved == gameGrid.numSquares - gameGrid.numMines) {
-                                            playing = false;
-                                            win = true;
+                                        if (state.grid.matrix[adj[0]][adj[1]].mine) {
+                                            state.exploded = state.grid.matrix[adj[0]][adj[1]];
+                                            state.playing = false;
+                                            state.win = false;
+                                        } else if (state.checkWinCondition()) {
+                                            state.playing = false;
+                                            state.win = true;
                                         }
                                     }
                                 }
@@ -209,49 +192,42 @@ public class Minesweeper {
                         }
                     }
 
-                } else if (btn == 3 && playing) {
+                } else if (btn == 3 && state.playing) {
                     if (square != null) {
-                        placeFlag(square);
+                        Square sqObj = state.grid.matrix[square[0]][square[1]];
+                        if (state.dungeonMode && sqObj.isStairs && sqObj.removed && sqObj.stairUnlocked) {
+                            sqObj.stairMarked = !sqObj.stairMarked;
+                        } else {
+                            GameLogic.placeFlag(state.grid, square);
+                            if (state.checkDungeonWin()) {
+                                state.playing = false;
+                                state.win = true;
+                            } else if (state.checkDungeonRoomCleared()) {
+                                state.win = true;
+                            } else if (state.dungeonMode) {
+                                state.win = false;
+                            }
+                        }
                     }
                 }
             }
 
-            // Python: GameScreen.draw(playing, exploded, event.type, win) + flip()
-            gameScreen.draw(playing, exploded, win);
+            drawAll();
         }
 
         SwingUtilities.invokeLater(() -> System.exit(0));
     }
 
     // =========================================================================
-    // rebuildGame — replaces Python "del GameGrid; GameGrid = Grid(n)" pattern
+    // rebuildGame
     // =========================================================================
 
     private static void rebuildGame(int difficulty) {
-        gameGrid = new Grid(difficulty);
-        try {
-            SwingUtilities.invokeAndWait(() -> {
-                frame.remove(gameScreen);
-                gameScreen = new Screen(gameGrid);
-                gameSettings = new SettingsMenu(gameGrid);
-                frame.add(gameScreen);
-                frame.pack();
-                frame.setLocationRelativeTo(null);
-                attachListeners(gameScreen);
-                gameScreen.setFocusable(true);
-                gameScreen.requestFocusInWindow();
-            });
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        // Clear stale events from previous game
-        eventQueue.clear();
-
-        playing = true;
-        generated = false;
-        exploded = null;
-        win = false;
-        gameScreen.draw(playing, exploded, win);
+        boolean wasDungeon = state.dungeonMode;
+        state.reset(new Grid(difficulty));
+        rebuildScreen();
+        if (!state.dungeonMode && wasDungeon) closeHudWindow();
+        drawAll();
     }
 
     private static void attachListeners(Screen screen) {
@@ -285,15 +261,10 @@ public class Minesweeper {
     }
 
     // =========================================================================
-    // Hold functions — blocking loops that work naturally with queue.take()
+    // Hold functions
     // =========================================================================
 
-    /**
-     * Port of Python holdButton().
-     * Shows click image while held; returns true if released over the button.
-     */
     static boolean holdButton(Button button) {
-        // Show click image (Python: blit clickImage + flip)
         boolean wasClickImage = button.clickImage != null;
         BufferedImage origImage = button.image;
         if (wasClickImage) {
@@ -324,11 +295,11 @@ public class Minesweeper {
                     gameScreen.repaint();
                     break;
                 case QUIT:
-                    eventQueue.add(e); // propagate so game loop can exit
+                    eventQueue.add(e);
                     done = true;
                     break;
                 default:
-                    break; // consume other events (same as Python)
+                    break;
             }
         }
 
@@ -337,15 +308,9 @@ public class Minesweeper {
         return result;
     }
 
-    /**
-     * Port of Python holdSquare().
-     * Left-click hold: shows Zero at the square under the cursor.
-     * Returns the adjacent list at the release position, or null if off-grid.
-     */
     static List<int[]> holdSquare(int[] square) {
-        List<int[]> adjacent = getAdjacentCoords(square[0], square[1]);
+        List<int[]> adjacent = state.grid.getAdjacentCoords(square[0], square[1]);
 
-        // Initial display: show scared face + blank the hovered square
         gameScreen.showClickOverlay();
         showZeroForSquare(adjacent.get(0));
 
@@ -362,25 +327,24 @@ public class Minesweeper {
             switch (e.type) {
                 case MOUSE_MOVE:
                 case MOUSE_DOWN: {
-                    int[] newSquare = selectSquare(e.x, e.y);
+                    int[] newSquare = state.grid.selectSquare(e.x, e.y);
                     if (newSquare != null) {
                         square = newSquare;
-                        adjacent = getAdjacentCoords(square[0], square[1]);
+                        adjacent = state.grid.getAdjacentCoords(square[0], square[1]);
                         gameScreen.showClickOverlay();
                         showZeroForSquare(adjacent.get(0));
                     } else {
                         adjacent = null;
                         gameScreen.clearOverlays();
-                        gameScreen.draw(playing, exploded, win);
+                        drawAll();
                     }
                     break;
                 }
                 case MOUSE_UP: {
-                    // Update square/adjacent at release position
-                    int[] newSquare = selectSquare(e.x, e.y);
+                    int[] newSquare = state.grid.selectSquare(e.x, e.y);
                     if (newSquare != null) {
                         square = newSquare;
-                        adjacent = getAdjacentCoords(square[0], square[1]);
+                        adjacent = state.grid.getAdjacentCoords(square[0], square[1]);
                     } else {
                         adjacent = null;
                     }
@@ -401,15 +365,9 @@ public class Minesweeper {
         return adjacent;
     }
 
-    /**
-     * Port of Python holdAdjacent().
-     * Middle-click hold: shows Zero at all adjacent squares.
-     * Returns the adjacent list at the release position, or null if off-grid.
-     */
     static List<int[]> holdAdjacent(int[] square) {
-        List<int[]> adjacent = getAdjacentCoords(square[0], square[1]);
+        List<int[]> adjacent = state.grid.getAdjacentCoords(square[0], square[1]);
 
-        // Show scared face + blank all adjacent squares
         gameScreen.showClickOverlay();
         showZeroForAdjacent(adjacent);
 
@@ -426,24 +384,24 @@ public class Minesweeper {
             switch (e.type) {
                 case MOUSE_MOVE:
                 case MOUSE_DOWN: {
-                    int[] newSquare = selectSquare(e.x, e.y);
+                    int[] newSquare = state.grid.selectSquare(e.x, e.y);
                     if (newSquare != null) {
                         square = newSquare;
-                        adjacent = getAdjacentCoords(square[0], square[1]);
+                        adjacent = state.grid.getAdjacentCoords(square[0], square[1]);
                         gameScreen.showClickOverlay();
                         showZeroForAdjacent(adjacent);
                     } else {
                         adjacent = null;
                         gameScreen.clearOverlays();
-                        gameScreen.draw(playing, exploded, win);
+                        drawAll();
                     }
                     break;
                 }
                 case MOUSE_UP: {
-                    int[] newSquare = selectSquare(e.x, e.y);
+                    int[] newSquare = state.grid.selectSquare(e.x, e.y);
                     if (newSquare != null) {
                         square = newSquare;
-                        adjacent = getAdjacentCoords(square[0], square[1]);
+                        adjacent = state.grid.getAdjacentCoords(square[0], square[1]);
                     } else {
                         adjacent = null;
                     }
@@ -464,9 +422,8 @@ public class Minesweeper {
         return adjacent;
     }
 
-    /** Show Zero_image at a single grid square (if not removed/flagged). */
     private static void showZeroForSquare(int[] gridCoord) {
-        Square sq = gameGrid.matrix[gridCoord[0]][gridCoord[1]];
+        Square sq = state.grid.matrix[gridCoord[0]][gridCoord[1]];
         if (!sq.removed && !sq.flagged) {
             List<int[]> positions = new ArrayList<>(1);
             positions.add(new int[]{sq.x, sq.y});
@@ -474,11 +431,10 @@ public class Minesweeper {
         }
     }
 
-    /** Show Zero_image at all non-removed, non-flagged adjacent squares. */
     private static void showZeroForAdjacent(List<int[]> adjacent) {
         List<int[]> positions = new ArrayList<>();
         for (int[] a : adjacent) {
-            Square sq = gameGrid.matrix[a[0]][a[1]];
+            Square sq = state.grid.matrix[a[0]][a[1]];
             if (!sq.removed && !sq.flagged) {
                 positions.add(new int[]{sq.x, sq.y});
             }
@@ -487,7 +443,7 @@ public class Minesweeper {
     }
 
     // =========================================================================
-    // openSettings — port of Python openSettings()
+    // openSettings
     // =========================================================================
 
     static int openSettings() {
@@ -500,7 +456,7 @@ public class Minesweeper {
             } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
                 gameScreen.clearSettings();
-                return gameGrid.difficulty;
+                return state.grid.difficulty;
             }
 
             if (e.type == GameEvent.EventType.QUIT) {
@@ -513,7 +469,6 @@ public class Minesweeper {
                 int mx = e.x;
                 int my = e.y;
 
-                // Check difficulty buttons
                 for (Button btn : gameSettings.buttons) {
                     if (btn.contains(mx, my)) {
                         gameScreen.clearSettings();
@@ -521,259 +476,96 @@ public class Minesweeper {
                     }
                 }
 
-                // Python: if selectButton(GameScreen.settingsButton, mouse_pos): holdButton(...)
                 if (gameScreen.settingsButton.contains(mx, my)) {
                     if (holdButton(gameScreen.settingsButton)) {
                         gameScreen.clearSettings();
-                        return gameGrid.difficulty; // same difficulty → no change
+                        return state.grid.difficulty;
                     }
-                    // Button was clicked but not released over it → stay in settings
                     gameScreen.drawSettings(gameSettings);
                 } else {
-                    // Clicked outside menu → close settings
                     gameScreen.clearSettings();
-                    return gameGrid.difficulty;
+                    return state.grid.difficulty;
                 }
             }
-            // Other events (mouse move, key): redraw settings
             gameScreen.drawSettings(gameSettings);
         }
     }
 
-    // =========================================================================
-    // Static game logic — port of Python global functions
-    // =========================================================================
 
-    public static void initCloseMines() {
-        for (int i = 0; i < gameGrid.columns; i++) {
-            for (int j = 0; j < gameGrid.rows; j++) {
-                getCloseMines(new int[]{i, j});
-            }
-        }
-    }
-
-    /** Port of Python getCloseMines(). */
-    public static void getCloseMines(int[] square) {
-        List<int[]> adjacent = getAdjacentCoords(square[0], square[1]);
-        // Start from index 1 to skip self (index 0)
-        for (int x = 1; x < adjacent.size(); x++) {
-            int[] a = adjacent.get(x);
-            if (gameGrid.matrix[a[0]][a[1]].mine) {
-                gameGrid.matrix[square[0]][square[1]].closeMines++;
-            }
-        }
-    }
-
-    /** Port of Python getCloseFlags(). */
-    public static int getCloseFlags(int[] square) {
-        List<int[]> adjacent = getAdjacentCoords(square[0], square[1]);
-        int close = 0;
-        for (int x = 1; x < adjacent.size(); x++) {
-            int[] a = adjacent.get(x);
-            if (gameGrid.matrix[a[0]][a[1]].flagged) {
-                close++;
-            }
-        }
-        return close;
-    }
-
-    /**
-     * Port of Python selectSquare() — binary search through coordMatrix.
-     * Coordinates are sorted as tuples: (x, y) — compare x first, then y.
-     */
-    public static int[] selectSquare(int mx, int my) {
-        for (int i = 0; i < gameGrid.columns; i++) {
-            for (int j = 0; j < gameGrid.rows; j++) {
-                List<int[]> coords = gameGrid.coordMatrix.get(i).get(j);
-                int start = 0, end = coords.size() - 1;
-                while (start <= end) {
-                    int mid = (start + end) / 2;
-                    int[] c = coords.get(mid);
-                    int cmp = compareCoord(mx, my, c[0], c[1]);
-                    if (cmp == 0) return new int[]{i, j};
-                    if (cmp < 0) end = mid - 1;
-                    else start = mid + 1;
-                }
-            }
-        }
-        return null;
-    }
-
-    /** Lexicographic comparison of pixel coords (x first, then y) — matches Python tuple compare. */
-    private static int compareCoord(int ax, int ay, int bx, int by) {
-        if (ax != bx) return Integer.compare(ax, bx);
-        return Integer.compare(ay, by);
-    }
-
-    /**
-     * Port of Python getSurrounding() — up to 3-ring of neighbors.
-     * The loop conditions are equivalent to:
-     *   outer: skip only i==0 && j==0 (handled separately as self)
-     *   inner: only add diagonal variants when i!=0 && j!=0
-     */
-    public static List<int[]> getSurroundingCoords(int column, int row) {
-        List<int[]> surrounding = new ArrayList<>();
-        for (int i = 0; i < 4; i++) {
-            for (int j = 0; j < 4; j++) {
-                if (i == 0 && j == 0) {
-                    surrounding.add(new int[]{column, row});
-                } else {
-                    if (column + i < gameGrid.columns && row - j >= 0)
-                        surrounding.add(new int[]{column + i, row - j});
-                    if (column - i >= 0 && row + j < gameGrid.rows)
-                        surrounding.add(new int[]{column - i, row + j});
-                    if (i != 0 && j != 0) {
-                        if (column + i < gameGrid.columns && row + j < gameGrid.rows)
-                            surrounding.add(new int[]{column + i, row + j});
-                        if (column - i >= 0 && row - j >= 0)
-                            surrounding.add(new int[]{column - i, row - j});
-                    }
-                }
-            }
-        }
-        return surrounding;
-    }
-
-    /**
-     * Port of Python getAdjacent() — self + up to 8 immediate neighbors.
-     * adjacent[0] is always the square itself (column, row).
-     */
-    public static List<int[]> getAdjacentCoords(int column, int row) {
-        List<int[]> adjacent = new ArrayList<>();
-        for (int i = 0; i < 2; i++) {
-            for (int j = 0; j < 2; j++) {
-                if (i == 0 && j == 0) {
-                    adjacent.add(new int[]{column, row});
-                } else {
-                    // "axis" neighbors: (col+i, row-j) and (col-i, row+j)
-                    if (column + i < gameGrid.columns && row - j >= 0)
-                        adjacent.add(new int[]{column + i, row - j});
-                    if (column - i >= 0 && row + j < gameGrid.rows)
-                        adjacent.add(new int[]{column - i, row + j});
-                    // "diagonal" neighbors: only when both i!=0 and j!=0
-                    if (i != 0 && j != 0) {
-                        if (column + i < gameGrid.columns && row + j < gameGrid.rows)
-                            adjacent.add(new int[]{column + i, row + j});
-                        if (column - i >= 0 && row - j >= 0)
-                            adjacent.add(new int[]{column - i, row - j});
-                    }
-                }
-            }
-        }
-        return adjacent;
-    }
-
-    /** Port of Python removeSquare(). */
-    public static boolean removeSquare(int[] square) {
-        Square sq = gameGrid.matrix[square[0]][square[1]];
-        if (sq.removed || sq.flagged) return false;
-        sq.removed = true;
-        gameGrid.numRemoved++;
-        clearField(square);
-        return true;
-    }
-
-    /** Port of Python clearField() — recursive flood fill for zero squares. */
-    public static void clearField(int[] square) {
-        if (gameGrid.matrix[square[0]][square[1]].closeMines != 0) return;
-        List<int[]> adjacent = getAdjacentCoords(square[0], square[1]);
-        for (int[] a : adjacent) {
-            if (!gameGrid.matrix[a[0]][a[1]].flagged) {
-                removeSquare(a);
-            }
-        }
-    }
-
-    /** Port of Python placeFlag(). */
-    public static boolean placeFlag(int[] square) {
-        Square sq = gameGrid.matrix[square[0]][square[1]];
-        if (!sq.removed) {
-            if (!sq.flagged) {
-                if (gameGrid.numFlags > 0) {
-                    gameGrid.numFlags--;
-                    sq.flagged = true;
-                    return true;
-                }
-            } else {
-                gameGrid.numFlags++;
-                sq.flagged = false;
-            }
-        }
-        return false;
-    }
 
     // =========================================================================
-    // Image loading
+    // UI helpers
     // =========================================================================
 
-    private static File resolveBaseDir() {
+    private static void drawAll() {
+        gameScreen.draw(state.playing, state.exploded, state.win);
+        if (hudPanel != null) {
+            hudPanel.setKeysFound(state.keysFound);
+            hudPanel.repaint();
+        }
+    }
+
+    private static void ensureHudWindow() {
         try {
-            File loc = new File(Minesweeper.class.getProtectionDomain()
-                    .getCodeSource().getLocation().toURI());
-            File dir = loc.isFile() ? loc.getParentFile() : loc;
-            for (int i = 0; i < 8; i++) {
-                if (new File(dir, "assets").isDirectory()) return dir;
-                if (dir.getParentFile() == null) break;
-                dir = dir.getParentFile();
-            }
-        } catch (Exception ignored) {}
-        return new File(System.getProperty("user.dir"));
+            SwingUtilities.invokeAndWait(() -> {
+                if (hudFrame != null) return;
+                hudPanel = new HudPanel(images);
+                hudFrame = new JFrame("Inventory");
+                hudFrame.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
+                hudFrame.add(hudPanel);
+                hudFrame.pack();
+                hudFrame.setResizable(false);
+                int hx = Math.max(0, frame.getX() - hudFrame.getWidth() - 10);
+                hudFrame.setLocation(hx, frame.getY());
+            });
+        } catch (Exception e) { e.printStackTrace(); }
     }
 
-    private static void loadImages(File baseDir) {
-        Corner_image        = load(baseDir, "corner.png");
-        CornerFlip_image    = load(baseDir, "cornerFlip.png");
-        Square_image        = load(baseDir, "square.png");
-        Zero_image          = load(baseDir, "NOsquare.png");
-        Flag_image          = load(baseDir, "flag.png");
-        Wrong_image         = load(baseDir, "wrong.png");
-        Mine_image          = load(baseDir, "mine.png");
-        Explode_image       = load(baseDir, "explode.png");
-        Happy_image         = load(baseDir, "happy.png");
-        HappyClick_image    = load(baseDir, "happyClick.png");
-        Sad_image           = load(baseDir, "sad.png");
-        Click_image         = load(baseDir, "clicking.png");
-        Settings_image      = load(baseDir, "settings.png");
-        SettingsClick_image = load(baseDir, "settingsClick.png");
-        Menu_image          = load(baseDir, "menu.png");
-        B1_image            = load(baseDir, "b1.png");
-        B1click_image       = load(baseDir, "b1click.png");
-        B2_image            = load(baseDir, "b2.png");
-        B3_image            = load(baseDir, "b3.png");
-        I1_image            = load(baseDir, "i1.png");
-        I2_image            = load(baseDir, "i2.png");
-        E_image             = load(baseDir, "expert.png");
-        Won_image           = load(baseDir, "won.png");
-        One_image           = load(baseDir, "one.png");
-        Two_image           = load(baseDir, "two.png");
-        Three_image         = load(baseDir, "three.png");
-        Four_image          = load(baseDir, "four.png");
-        Five_image          = load(baseDir, "five.png");
-        Six_image           = load(baseDir, "six.png");
-        Seven_image         = load(baseDir, "seven.png");
-        Eight_image         = load(baseDir, "eight.png");
-    }
-
-    private static BufferedImage load(File baseDir, String name) {
+    private static void toggleHudWindow() {
+        ensureHudWindow();
         try {
-            return ImageIO.read(new File(baseDir, "assets/" + name));
-        } catch (IOException e) {
-            System.err.println("Failed to load image: " + name + " — " + e.getMessage());
-            // Return magenta placeholder so game still runs
-            BufferedImage img = new BufferedImage(30, 30, BufferedImage.TYPE_INT_RGB);
-            java.awt.Graphics g = img.getGraphics();
-            g.setColor(java.awt.Color.MAGENTA);
-            g.fillRect(0, 0, 30, 30);
-            g.dispose();
-            return img;
-        }
+            SwingUtilities.invokeAndWait(() -> {
+                if (hudFrame.isVisible()) {
+                    hudFrame.setVisible(false);
+                } else {
+                    int hx = Math.max(0, frame.getX() - hudFrame.getWidth() - 10);
+                    hudFrame.setLocation(hx, frame.getY());
+                    hudFrame.setVisible(true);
+                }
+            });
+        } catch (Exception e) { e.printStackTrace(); }
     }
 
-    // =========================================================================
-    // Utility
-    // =========================================================================
+    private static void closeHudWindow() {
+        try {
+            SwingUtilities.invokeAndWait(() -> {
+                if (hudFrame != null) { hudFrame.dispose(); hudFrame = null; }
+                hudPanel = null;
+            });
+        } catch (Exception e) { e.printStackTrace(); }
+    }
 
-    /** Convert Swing mouse button to pygame-style (1=left, 2=middle, 3=right). */
+    private static void rebuildScreen() {
+        try {
+            SwingUtilities.invokeAndWait(() -> {
+                frame.remove(gameScreen);
+                gameScreen = new Screen(state.grid, images, state.dungeonMode);
+                gameSettings = new SettingsMenu(state.grid, images);
+                frame.add(gameScreen);
+                frame.setResizable(true);
+                frame.pack();
+                frame.setResizable(false);
+                frame.setLocationRelativeTo(null);
+                attachListeners(gameScreen);
+                gameScreen.setFocusable(true);
+                gameScreen.requestFocusInWindow();
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        eventQueue.clear();
+    }
+
     private static int swingToButton(int swingButton) {
         switch (swingButton) {
             case MouseEvent.BUTTON1: return 1;

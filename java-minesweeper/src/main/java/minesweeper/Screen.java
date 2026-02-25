@@ -8,11 +8,6 @@ import java.awt.image.BufferedImage;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Extends JPanel. Replaces the Python Screen class.
- * paintComponent() performs all blitting (replaces pygame blit + display.flip()).
- * All state mutations happen on the game thread; repaint() posts to EDT.
- */
 public class Screen extends JPanel {
 
     private static final Color GREY       = new Color(185, 185, 185);
@@ -21,8 +16,11 @@ public class Screen extends JPanel {
     private static final Color OFF_WHITE  = new Color(243, 243, 243);
 
     public final Grid grid;
+    public final ImageAssets images;
+    public final boolean dungeonMode;
     public Button resetButton;
     public Button settingsButton;
+    public Button bagButton; // null when not in dungeon mode
 
     // Background drawn once in constructor
     private final BufferedImage background;
@@ -34,25 +32,35 @@ public class Screen extends JPanel {
 
     // Overlays for hold functions
     private volatile boolean overlayClickActive = false;
-    // List of pixel {x,y} positions to draw Zero_image during hold
     private volatile List<int[]> overlayZeroPositions = Collections.emptyList();
 
     // Settings menu overlay
     private volatile boolean settingsActive = false;
     private volatile SettingsMenu settingsMenu = null;
 
-    public Screen(Grid grid) {
+    public Screen(Grid grid, ImageAssets images, boolean dungeonMode) {
         this.grid = grid;
-        int totalW = grid.W + Minesweeper.ORIGIN_X * 2;
-        int totalH = grid.H + Minesweeper.ORIGIN_Y + 20;
+        this.images = images;
+        this.dungeonMode = dungeonMode;
+        int totalW = grid.W + grid.originX * 2;
+        int totalH = grid.H + grid.originY + 20;
         setPreferredSize(new java.awt.Dimension(totalW, totalH));
 
         resetButton = new Button(
-            new int[]{grid.W / 2, 10}, 40, 40,
-            Minesweeper.Happy_image, Minesweeper.HappyClick_image);
+            new int[]{grid.originX + (grid.columns / 2) * Grid.SQUARE_SIZE,
+                      grid.originY - 2 * Grid.SQUARE_SIZE}, 30, 30,
+            images.happy, images.happyClick);
         settingsButton = new Button(
-            new int[]{grid.W - 16, 10}, 40, 40,
-            Minesweeper.Settings_image, Minesweeper.SettingsClick_image);
+            new int[]{grid.originX + (grid.columns - 1) * Grid.SQUARE_SIZE,
+                      grid.originY - 2 * Grid.SQUARE_SIZE}, 30, 30,
+            images.settings, images.settingsClick);
+
+        if (dungeonMode) {
+            bagButton = new Button(
+                new int[]{grid.originX + (grid.columns - 2) * Grid.SQUARE_SIZE,
+                          grid.originY - 2 * Grid.SQUARE_SIZE}, 30, 30,
+                images.bag, images.bagClick);
+        }
 
         // Draw static 3D border background once
         background = new BufferedImage(totalW, totalH, BufferedImage.TYPE_INT_RGB);
@@ -62,48 +70,43 @@ public class Screen extends JPanel {
         bg.fillRect(0, 0, totalW, totalH);
 
         bg.setColor(LIGHT_GREY);
-        bg.fillRect(Minesweeper.ORIGIN_X, Minesweeper.ORIGIN_Y, grid.W, grid.H);
+        bg.fillRect(grid.originX, grid.originY, grid.W, grid.H);
 
         bg.setColor(DARK_GREY);
-        bg.fillRect(Minesweeper.ORIGIN_X - 4, Minesweeper.ORIGIN_Y - 4, 4, grid.H + 4);
+        bg.fillRect(grid.originX - 4, grid.originY - 4, 4, grid.H + 4);
 
         bg.setColor(OFF_WHITE);
-        bg.fillRect(Minesweeper.ORIGIN_X, Minesweeper.ORIGIN_Y + grid.H, grid.W, 4);
+        bg.fillRect(grid.originX, grid.originY + grid.H, grid.W, 4);
 
         bg.setColor(DARK_GREY);
-        bg.fillRect(Minesweeper.ORIGIN_X, Minesweeper.ORIGIN_Y - 4, grid.W, 4);
+        bg.fillRect(grid.originX, grid.originY - 4, grid.W, 4);
 
         bg.setColor(OFF_WHITE);
-        bg.fillRect(grid.W + Minesweeper.ORIGIN_X, Minesweeper.ORIGIN_Y, 4, grid.H + 4);
+        bg.fillRect(grid.W + grid.originX, grid.originY, 4, grid.H + 4);
 
-        bg.drawImage(Minesweeper.Corner_image,     grid.W + Minesweeper.ORIGIN_X,          Minesweeper.ORIGIN_Y - 4, null);
-        bg.drawImage(Minesweeper.Corner_image,     Minesweeper.ORIGIN_X - 4,               Minesweeper.ORIGIN_Y + grid.H, null);
-        bg.drawImage(Minesweeper.CornerFlip_image, 0,                                      grid.H + Minesweeper.ORIGIN_Y + 16, null);
-        bg.drawImage(Minesweeper.CornerFlip_image, grid.W + Minesweeper.ORIGIN_X * 2 - 4, 0, null);
+        bg.drawImage(images.corner,     grid.W + grid.originX,          grid.originY - 4, null);
+        bg.drawImage(images.corner,     grid.originX - 4,               grid.originY + grid.H, null);
+        bg.drawImage(images.cornerFlip, 0,                              grid.H + grid.originY + 16, null);
+        bg.drawImage(images.cornerFlip, grid.W + grid.originX * 2 - 4, 0, null);
 
         bg.setColor(OFF_WHITE);
-        bg.fillRect(0, 0, 4, grid.H + Minesweeper.ORIGIN_Y + 16);
-        bg.fillRect(0, 0, grid.W + Minesweeper.ORIGIN_X + 16, 4);
+        bg.fillRect(0, 0, 4, grid.H + grid.originY + 16);
+        bg.fillRect(0, 0, grid.W + grid.originX + 16, 4);
 
         bg.setColor(DARK_GREY);
-        bg.fillRect(4, grid.H + Minesweeper.ORIGIN_Y + 16, totalW, 4);
-        bg.fillRect(grid.W + Minesweeper.ORIGIN_X * 2 - 4, 4, 4, grid.H + Minesweeper.ORIGIN_Y + 16);
+        bg.fillRect(4, grid.H + grid.originY + 16, totalW, 4);
+        bg.fillRect(grid.W + grid.originX * 2 - 4, 4, 4, grid.H + grid.originY + 16);
 
         bg.dispose();
     }
 
-    /**
-     * Update render state and trigger repaint.
-     * Replaces: GameScreen.draw(playing, exploded, win) + pygame.display.flip()
-     */
     public void draw(boolean playing, Square exploded, boolean win) {
-        // Update reset button image for win state
         if (win) {
-            resetButton.image = Minesweeper.Won_image;
+            resetButton.image = images.won;
         } else if (!playing && exploded != null) {
-            resetButton.image = Minesweeper.Sad_image;
+            resetButton.image = images.sad;
         } else {
-            resetButton.image = Minesweeper.Happy_image;
+            resetButton.image = images.happy;
         }
         this.paintPlaying = playing;
         this.paintExploded = exploded;
@@ -113,13 +116,11 @@ public class Screen extends JPanel {
         repaint();
     }
 
-    /** Show Click_image at reset button (scared face during hold). */
     public void showClickOverlay() {
         this.overlayClickActive = true;
         repaint();
     }
 
-    /** Show Zero_image at these pixel positions (used during hold). */
     public void showZeroAtPositions(List<int[]> positions) {
         this.overlayZeroPositions = positions;
         repaint();
@@ -131,7 +132,6 @@ public class Screen extends JPanel {
         repaint();
     }
 
-    /** Show the settings menu overlay. Port of Python GameSettings.draw() */
     public void drawSettings(SettingsMenu settings) {
         this.settingsMenu = settings;
         this.settingsActive = true;
@@ -149,7 +149,6 @@ public class Screen extends JPanel {
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g;
 
-        // Snapshot volatile state for consistent paint
         boolean playing = paintPlaying;
         Square exploded = paintExploded;
         boolean win = paintWin;
@@ -158,15 +157,15 @@ public class Screen extends JPanel {
         boolean showSettings = settingsActive;
         SettingsMenu menu = settingsMenu;
 
-        // Draw static background
         g2.drawImage(background, 0, 0, null);
 
-        // Draw reset and settings buttons
-        BufferedImage resetImg = clickActive ? Minesweeper.Click_image : resetButton.image;
+        BufferedImage resetImg = clickActive ? images.click : resetButton.image;
         g2.drawImage(resetImg, resetButton.xy[0], resetButton.xy[1], null);
         g2.drawImage(settingsButton.image, settingsButton.xy[0], settingsButton.xy[1], null);
+        if (bagButton != null) {
+            g2.drawImage(bagButton.image, bagButton.xy[0], bagButton.xy[1], null);
+        }
 
-        // Draw grid squares
         for (int col = 0; col < grid.columns; col++) {
             for (int row = 0; row < grid.rows; row++) {
                 Square sq = grid.matrix[col][row];
@@ -174,61 +173,63 @@ public class Screen extends JPanel {
                 if (playing) {
                     if (sq.removed) {
                         if (!sq.mine) {
-                            g2.drawImage(numberImage(sq.closeMines), sq.x, sq.y, null);
+                            if (sq.isStairs) {
+                                BufferedImage stairImg = sq.stairMarked ? images.greenFlag
+                                        : (sq.stairUnlocked ? images.stairs : images.lockedStair);
+                                g2.drawImage(stairImg, sq.x, sq.y, null);
+                            } else if (sq.isKey && !sq.keyCollected) {
+                                g2.drawImage(images.key, sq.x, sq.y, null);
+                            } else {
+                                g2.drawImage(images.numberImage(sq.closeMines), sq.x, sq.y, null);
+                            }
                         }
                     } else if (!sq.flagged) {
-                        g2.drawImage(Minesweeper.Square_image, sq.x, sq.y, null);
+                        g2.drawImage(images.square, sq.x, sq.y, null);
                     } else {
-                        g2.drawImage(Minesweeper.Flag_image, sq.x, sq.y, null);
+                        g2.drawImage(images.flag, sq.x, sq.y, null);
                     }
                 } else {
-                    // Game over
                     if (sq == exploded) {
-                        g2.drawImage(Minesweeper.Explode_image, sq.x, sq.y, null);
+                        g2.drawImage(images.explode, sq.x, sq.y, null);
                     } else if (!sq.removed && sq.mine && !sq.flagged) {
-                        g2.drawImage(Minesweeper.Mine_image, sq.x, sq.y, null);
+                        g2.drawImage(images.mine, sq.x, sq.y, null);
                     } else if (!sq.removed && !sq.mine && sq.flagged) {
-                        g2.drawImage(Minesweeper.Wrong_image, sq.x, sq.y, null);
+                        g2.drawImage(images.wrong, sq.x, sq.y, null);
                     }
 
                     if (win) {
                         if (sq.removed && !sq.mine) {
-                            g2.drawImage(numberImage(sq.closeMines), sq.x, sq.y, null);
+                            g2.drawImage(images.numberImage(sq.closeMines), sq.x, sq.y, null);
                         } else if (!sq.removed && sq.mine) {
-                            g2.drawImage(Minesweeper.Flag_image, sq.x, sq.y, null);
+                            g2.drawImage(images.flag, sq.x, sq.y, null);
                         }
                     }
                 }
             }
         }
 
-        // Overlays from hold functions (drawn on top of grid)
+        // Gridlines
+        g2.setColor(DARK_GREY);
+        g2.setStroke(new java.awt.BasicStroke(2));
+        for (int x = grid.originX; x <= grid.originX + grid.W; x += Grid.SQUARE_SIZE) {
+            g2.drawLine(x, grid.originY, x, grid.originY + grid.H);
+        }
+        for (int y = grid.originY; y <= grid.originY + grid.H; y += Grid.SQUARE_SIZE) {
+            g2.drawLine(grid.originX, y, grid.originX + grid.W, y);
+        }
+        g2.setStroke(new java.awt.BasicStroke(1));
+
         for (int[] pos : zeroPositions) {
-            g2.drawImage(Minesweeper.Zero_image, pos[0], pos[1], null);
+            g2.drawImage(images.zero, pos[0], pos[1], null);
         }
 
-        // Settings menu overlay
         if (showSettings && menu != null) {
             int menuX = grid.W - 160;
-            int menuY = Minesweeper.ORIGIN_Y;
-            g2.drawImage(Minesweeper.Menu_image, menuX, menuY, null);
+            int menuY = grid.originY;
+            g2.drawImage(images.menu, menuX, menuY, null);
             for (Button btn : menu.buttons) {
                 g2.drawImage(btn.image, btn.xy[0], btn.xy[1], null);
             }
-        }
-    }
-
-    private BufferedImage numberImage(int n) {
-        switch (n) {
-            case 1: return Minesweeper.One_image;
-            case 2: return Minesweeper.Two_image;
-            case 3: return Minesweeper.Three_image;
-            case 4: return Minesweeper.Four_image;
-            case 5: return Minesweeper.Five_image;
-            case 6: return Minesweeper.Six_image;
-            case 7: return Minesweeper.Seven_image;
-            case 8: return Minesweeper.Eight_image;
-            default: return Minesweeper.Zero_image;
         }
     }
 }

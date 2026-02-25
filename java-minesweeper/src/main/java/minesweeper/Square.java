@@ -23,6 +23,21 @@ public class Square {
     // CLOSE_MINES = 4
     public int closeMines;
 
+    // STAIRS — true when this square is a dungeon staircase
+    public boolean isStairs = false;
+
+    // KEY — true when this square is a key that unlocks the stairs on this floor
+    public boolean isKey = false;
+
+    // KEY_COLLECTED — true after the player clicks a revealed key to pick it up
+    public boolean keyCollected = false;
+
+    // STAIR_UNLOCKED — true after the player spends a key to unlock this stair
+    public boolean stairUnlocked = false;
+
+    // STAIR_MARKED — green flag marker on a revealed stair (does NOT affect numFlags or getCloseFlags)
+    public boolean stairMarked = false;
+
     public Square(int x, int y) {
         this.x = x;
         this.y = y;
