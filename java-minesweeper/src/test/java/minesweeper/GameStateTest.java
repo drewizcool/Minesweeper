@@ -162,4 +162,9 @@ class GameStateTest {
         assertEquals(42, col);
         assertEquals(17, row);
     }
+
+    @Test
+    void deliberatelyFailing() {
+        assertEquals(1, 2, "This test is intentionally failing to verify CI catches failures");
+    }
 }
