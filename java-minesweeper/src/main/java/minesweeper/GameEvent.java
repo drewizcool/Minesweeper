@@ -2,7 +2,7 @@ package minesweeper;
 
 public class GameEvent {
     public enum EventType {
-        MOUSE_DOWN, MOUSE_UP, MOUSE_MOVE, KEY_PRESS, QUIT
+        MOUSE_DOWN, MOUSE_UP, MOUSE_MOVE, KEY_PRESS, KEY_RELEASE, QUIT
     }
 
     public final EventType type;
@@ -34,6 +34,10 @@ public class GameEvent {
 
     public static GameEvent keyPress(int keyCode) {
         return new GameEvent(EventType.KEY_PRESS, 0, 0, 0, keyCode);
+    }
+
+    public static GameEvent keyRelease(int keyCode) {
+        return new GameEvent(EventType.KEY_RELEASE, 0, 0, 0, keyCode);
     }
 
     public static GameEvent quit() {

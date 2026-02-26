@@ -45,6 +45,15 @@ public class ImageAssets {
     public final BufferedImage six;
     public final BufferedImage seven;
     public final BufferedImage eight;
+    public final BufferedImage player;
+    public final BufferedImage playerUp;
+    public final BufferedImage playerDown;
+    public final BufferedImage playerLeft;
+    public final BufferedImage playerRight;
+    public final BufferedImage playerUpFlag;
+    public final BufferedImage playerDownFlag;
+    public final BufferedImage playerLeftFlag;
+    public final BufferedImage playerRightFlag;
 
     public ImageAssets(File baseDir) {
         corner        = load(baseDir, "corner.png");
@@ -85,6 +94,15 @@ public class ImageAssets {
         six           = load(baseDir, "six.png");
         seven         = load(baseDir, "seven.png");
         eight         = load(baseDir, "eight.png");
+        player        = load(baseDir, "player.png");
+        playerUp      = load(baseDir, "playerUp.png");
+        playerDown    = load(baseDir, "playerDown.png");
+        playerLeft    = load(baseDir, "playerLeft.png");
+        playerRight   = load(baseDir, "playerRight.png");
+        playerUpFlag    = load(baseDir, "playerUpFlag.png");
+        playerDownFlag  = load(baseDir, "playerDownFlag.png");
+        playerLeftFlag  = load(baseDir, "playerLeftFlag.png");
+        playerRightFlag = load(baseDir, "playerRightFlag.png");
     }
 
     public BufferedImage numberImage(int n) {

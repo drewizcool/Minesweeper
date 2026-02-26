@@ -26,6 +26,7 @@ public class GameState {
     public int liveRoomDepth = 0;
     public volatile int keysNeeded = 0;
     public volatile int keysFound = 0;
+    public Player player;
 
     // Floor ID tracking — each newly created floor gets a unique ID
     public int nextFloorId = 2;    // 1 is reserved for the initial big dungeon
@@ -56,6 +57,7 @@ public class GameState {
         this.keysFound = 0;
         this.nextFloorId = 2;
         this.currentFloorId = 1;
+        this.player = null;
         this.grid = newGrid;
         this.playing = true;
         this.generated = false;
@@ -65,6 +67,7 @@ public class GameState {
 
     public void resetCurrentFloor() {
         this.grid = new Grid(grid.difficulty);
+        this.player = null;
         this.subFloorDifficulty = new HashMap<>();
         this.currentSubFloorCache = new HashMap<>();
         this.keysNeeded = 0;

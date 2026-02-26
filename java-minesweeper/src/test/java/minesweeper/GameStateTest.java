@@ -21,7 +21,7 @@ class GameStateTest {
         state.dungeonStack.push(new DungeonFloor(g, state.subFloorDifficulty,
                 true, true, null, false,
                 new java.util.HashMap<>(), 1L,
-                1, false, 0, false, 0, 0, 1));
+                1, false, 0, false, 0, 0, 1, null));
 
         state.reset(new Grid(3, 20, 90));
         assertFalse(state.dungeonMode);
@@ -136,7 +136,7 @@ class GameStateTest {
         state.dungeonStack.push(new DungeonFloor(g, state.subFloorDifficulty,
                 true, true, null, false,
                 new java.util.HashMap<>(), 1L,
-                1, false, 0, false, 0, 0, 1));
+                1, false, 0, false, 0, 0, 1, null));
         int stackSize = state.dungeonStack.size();
         int floorDepth = state.dungeonFloorDepth;
         boolean isDead = state.currentFloorIsDead;

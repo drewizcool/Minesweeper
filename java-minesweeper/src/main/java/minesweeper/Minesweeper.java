@@ -3,9 +3,9 @@ package minesweeper;
 import javax.swing.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 public class Minesweeper {
 
@@ -23,6 +23,18 @@ public class Minesweeper {
     private static JFrame frame;
     private static JFrame hudFrame = null;
     public  static volatile HudPanel hudPanel = null;
+
+    // Arrow key tracking: last-pressed key wins
+    private static final Set<Integer> ARROW_KEYS = Set.of(
+            KeyEvent.VK_UP, KeyEvent.VK_DOWN, KeyEvent.VK_LEFT, KeyEvent.VK_RIGHT,
+            KeyEvent.VK_W, KeyEvent.VK_A, KeyEvent.VK_S, KeyEvent.VK_D);
+    private static final Set<Integer> heldArrows = new HashSet<>();
+    private static final Deque<Integer> arrowStack = new ArrayDeque<>(); // most recent on top
+    private static final long MOVE_INTERVAL_MS = 33; // ~30 fps movement
+    private static long lastMoveTime = 0;
+
+    // Action mode: false = reveal, true = flag
+    private static boolean flagMode = false;
 
     // =========================================================================
     // main()
@@ -69,33 +81,118 @@ public class Minesweeper {
         boolean run = true;
 
         while (run) {
+            boolean needsRedraw = false;
             GameEvent event;
             try {
-                event = eventQueue.take();
+                boolean wantsMovement = !arrowStack.isEmpty() && state.dungeonMode
+                        && state.player != null && state.playing;
+                if (wantsMovement) {
+                    long elapsed = System.currentTimeMillis() - lastMoveTime;
+                    long remaining = Math.max(1, MOVE_INTERVAL_MS - elapsed);
+                    event = eventQueue.poll(remaining, TimeUnit.MILLISECONDS);
+                } else {
+                    event = eventQueue.take();
+                }
             } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
                 break;
             }
 
-            if (event.type == GameEvent.EventType.QUIT) {
+            if (event != null && event.type == GameEvent.EventType.QUIT) {
                 run = false;
 
-            } else if (event.type == GameEvent.EventType.KEY_PRESS) {
-                if (event.keyCode == KeyEvent.VK_F2) {
+            } else if (event != null && event.type == GameEvent.EventType.KEY_PRESS) {
+                if (ARROW_KEYS.contains(event.keyCode)) {
+                    if (heldArrows.add(event.keyCode)) {
+                        arrowStack.push(event.keyCode);
+                    }
+                    // Immediate first move on key press
+                    lastMoveTime = 0;
+                } else if (event.keyCode == KeyEvent.VK_F2) {
                     if (state.dungeonMode) {
                         state.resetCurrentFloor();
+                        heldArrows.clear();
+                        arrowStack.clear();
                         rebuildScreen();
-                        drawAll();
                     } else {
                         rebuildGame(state.grid.difficulty);
                     }
+                    needsRedraw = true;
                 } else if (event.keyCode == KeyEvent.VK_ESCAPE && state.dungeonMode && !state.dungeonStack.isEmpty()) {
                     DungeonManager.exitDungeonFloor(state);
+                    heldArrows.clear();
+                    arrowStack.clear();
                     rebuildScreen();
-                    drawAll();
+                    needsRedraw = true;
+                } else if (event.keyCode == KeyEvent.VK_ENTER && state.dungeonMode
+                        && state.player != null && state.playing) {
+                    int col = state.player.gridCol();
+                    int row = state.player.gridRow();
+                    if (col >= 0 && col < state.grid.columns && row >= 0 && row < state.grid.rows) {
+                        Square sqObj = state.grid.matrix[col][row];
+                        if (sqObj.isStairs && sqObj.removed && sqObj.stairUnlocked) {
+                            DungeonManager.enterDungeonFloor(state, col, row);
+                            heldArrows.clear();
+                            arrowStack.clear();
+                            rebuildScreen();
+                            needsRedraw = true;
+                        }
+                    }
+                } else if (event.keyCode == KeyEvent.VK_SHIFT && state.dungeonMode) {
+                    flagMode = !flagMode;
+                    needsRedraw = true;
+                } else if (event.keyCode == KeyEvent.VK_SPACE && state.dungeonMode
+                        && state.player != null && state.playing && state.generated) {
+                    int targetCol = state.player.gridCol() + state.player.facingDx;
+                    int targetRow = state.player.gridRow() + state.player.facingDy;
+                    if (targetCol >= 0 && targetCol < state.grid.columns
+                            && targetRow >= 0 && targetRow < state.grid.rows) {
+                        int[] target = {targetCol, targetRow};
+                        Square sqObj = state.grid.matrix[targetCol][targetRow];
+                        if (flagMode) {
+                            if (state.player.canPlaceFlag(targetCol, targetRow)) {
+                                if (sqObj.isStairs && sqObj.removed && sqObj.stairUnlocked) {
+                                    sqObj.stairMarked = !sqObj.stairMarked;
+                                } else {
+                                    GameLogic.placeFlag(state.grid, target);
+                                    if (state.checkDungeonWin()) {
+                                        state.playing = false;
+                                        state.win = true;
+                                    } else if (state.checkDungeonRoomCleared()) {
+                                        state.win = true;
+                                    } else {
+                                        state.win = false;
+                                    }
+                                }
+                            }
+                        } else {
+                            if (!sqObj.removed && !sqObj.flagged) {
+                                boolean removed = GameLogic.removeSquare(state.grid, target);
+                                if (removed) {
+                                    if (sqObj.mine) {
+                                        state.exploded = sqObj;
+                                        state.playing = false;
+                                        state.win = false;
+                                        state.generated = false;
+                                    } else if (state.checkWinCondition()) {
+                                        state.playing = false;
+                                        state.win = true;
+                                    }
+                                }
+                            }
+                        }
+                        needsRedraw = true;
+                    }
                 }
 
-            } else if (event.type == GameEvent.EventType.MOUSE_DOWN) {
+            } else if (event != null && event.type == GameEvent.EventType.KEY_RELEASE) {
+                if (ARROW_KEYS.contains(event.keyCode)) {
+                    heldArrows.remove(event.keyCode);
+                    arrowStack.remove(event.keyCode);
+                }
+
+            } else if (event != null && event.type == GameEvent.EventType.MOUSE_DOWN) {
+                needsRedraw = true;
                 int mx = event.x;
                 int my = event.y;
                 int btn = event.button;
@@ -106,8 +203,9 @@ public class Minesweeper {
                         if (holdButton(gameScreen.resetButton)) {
                             if (state.dungeonMode) {
                                 state.resetCurrentFloor();
+                                heldArrows.clear();
+                                arrowStack.clear();
                                 rebuildScreen();
-                                drawAll();
                             } else {
                                 rebuildGame(state.grid.difficulty);
                             }
@@ -134,24 +232,23 @@ public class Minesweeper {
                             GameLogic.initCloseMines(state.grid);
                             if (state.dungeonMode) DungeonManager.placeDungeonStairs(state);
                             state.generated = true;
+                            if (state.dungeonMode) {
+                                Square firstSq = state.grid.matrix[square[0]][square[1]];
+                                state.player = new Player(
+                                    firstSq.x, firstSq.y,
+                                    state.grid.originX, state.grid.originY);
+                            }
                         }
                         List<int[]> adjacent = holdSquare(square);
                         if (adjacent != null) {
                             int[] sq0 = adjacent.get(0);
                             Square sqObj = state.grid.matrix[sq0[0]][sq0[1]];
-                            if (state.dungeonMode && sqObj.isKey && sqObj.removed && !sqObj.keyCollected) {
-                                sqObj.keyCollected = true;
-                                state.keysFound++;
-                            } else if (state.dungeonMode && sqObj.isStairs && sqObj.removed) {
-                                if (sqObj.stairUnlocked) {
-                                    DungeonManager.enterDungeonFloor(state, sq0[0], sq0[1]);
-                                    rebuildScreen();
-                                    drawAll();
-                                } else if (state.keysFound > 0) {
-                                    state.keysFound--;
-                                    sqObj.stairUnlocked = true;
-                                }
-                            } else {
+                            if (state.dungeonMode && sqObj.isStairs && sqObj.removed
+                                    && !sqObj.stairUnlocked && state.keysFound > 0) {
+                                state.keysFound--;
+                                sqObj.stairUnlocked = true;
+                            } else if (!(state.dungeonMode && sqObj.isKey && sqObj.removed)
+                                    && !(state.dungeonMode && sqObj.isStairs && sqObj.removed)) {
                                 boolean removed = GameLogic.removeSquare(state.grid, sq0);
                                 if (removed) {
                                     if (state.grid.matrix[sq0[0]][sq0[1]].mine) {
@@ -195,7 +292,10 @@ public class Minesweeper {
                 } else if (btn == 3 && state.playing) {
                     if (square != null) {
                         Square sqObj = state.grid.matrix[square[0]][square[1]];
-                        if (state.dungeonMode && sqObj.isStairs && sqObj.removed && sqObj.stairUnlocked) {
+                        if (state.dungeonMode && state.player != null
+                                && !state.player.canPlaceFlag(square[0], square[1])) {
+                            // Outside flag placement radius — ignore
+                        } else if (state.dungeonMode && sqObj.isStairs && sqObj.removed && sqObj.stairUnlocked) {
                             sqObj.stairMarked = !sqObj.stairMarked;
                         } else {
                             GameLogic.placeFlag(state.grid, square);
@@ -212,7 +312,30 @@ public class Minesweeper {
                 }
             }
 
-            drawAll();
+            // Continuous movement tick based on held arrow keys (time-gated)
+            long now = System.currentTimeMillis();
+            if (!arrowStack.isEmpty() && state.dungeonMode
+                    && state.player != null && state.playing
+                    && now - lastMoveTime >= MOVE_INTERVAL_MS) {
+                lastMoveTime = now;
+                int activeKey = arrowStack.peek();
+                int dx = 0, dy = 0;
+                switch (activeKey) {
+                    case KeyEvent.VK_UP:    case KeyEvent.VK_W: dy = -1; break;
+                    case KeyEvent.VK_DOWN:  case KeyEvent.VK_S: dy =  1; break;
+                    case KeyEvent.VK_LEFT:  case KeyEvent.VK_A: dx = -1; break;
+                    case KeyEvent.VK_RIGHT: case KeyEvent.VK_D: dx =  1; break;
+                }
+                if (dx != 0 || dy != 0) {
+                    state.player.move(dx, dy, state.grid);
+                    state.player.facingDx = dx;
+                    state.player.facingDy = dy;
+                    checkKeyCollection();
+                    needsRedraw = true;
+                }
+            }
+
+            if (needsRedraw) drawAll();
         }
 
         SwingUtilities.invokeLater(() -> System.exit(0));
@@ -225,6 +348,9 @@ public class Minesweeper {
     private static void rebuildGame(int difficulty) {
         boolean wasDungeon = state.dungeonMode;
         state.reset(new Grid(difficulty));
+        heldArrows.clear();
+        arrowStack.clear();
+        flagMode = false;
         rebuildScreen();
         if (!state.dungeonMode && wasDungeon) closeHudWindow();
         drawAll();
@@ -234,6 +360,7 @@ public class Minesweeper {
         screen.addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
+                screen.requestFocusInWindow();
                 eventQueue.add(GameEvent.mouseDown(e.getX(), e.getY(), swingToButton(e.getButton())));
             }
             @Override
@@ -255,6 +382,10 @@ public class Minesweeper {
             @Override
             public void keyPressed(KeyEvent e) {
                 eventQueue.add(GameEvent.keyPress(e.getKeyCode()));
+            }
+            @Override
+            public void keyReleased(KeyEvent e) {
+                eventQueue.add(GameEvent.keyRelease(e.getKeyCode()));
             }
         });
         screen.setFocusable(true);
@@ -497,8 +628,21 @@ public class Minesweeper {
     // UI helpers
     // =========================================================================
 
+    private static void checkKeyCollection() {
+        if (state.player == null) return;
+        int col = state.player.gridCol();
+        int row = state.player.gridRow();
+        if (col >= 0 && col < state.grid.columns && row >= 0 && row < state.grid.rows) {
+            Square sq = state.grid.matrix[col][row];
+            if (sq.isKey && sq.removed && !sq.keyCollected) {
+                sq.keyCollected = true;
+                state.keysFound++;
+            }
+        }
+    }
+
     private static void drawAll() {
-        gameScreen.draw(state.playing, state.exploded, state.win);
+        gameScreen.draw(state.playing, state.exploded, state.win, state.player, flagMode);
         if (hudPanel != null) {
             hudPanel.setKeysFound(state.keysFound);
             hudPanel.repaint();

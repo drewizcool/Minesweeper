@@ -9,6 +9,7 @@ class PlayerTest {
     // Difficulty 1 = 8x8 grid, SQUARE_SIZE = 30
     private static final int ORIGIN_X = 20;
     private static final int ORIGIN_Y = 90;
+    private static final int SQ = Grid.SQUARE_SIZE; // 30
 
     /**
      * Create a small grid with a revealed 4x4 region for player movement tests.
@@ -21,10 +22,10 @@ class PlayerTest {
         return g;
     }
 
-    /** Player at the pixel center of grid cell (1,1). */
+    /** Player at the top-left of grid cell (1,1). */
     private Player makePlayer() {
-        double px = ORIGIN_X + 1 * 30 + 15;
-        double py = ORIGIN_Y + 1 * 30 + 15;
+        double px = ORIGIN_X + 1 * SQ;
+        double py = ORIGIN_Y + 1 * SQ;
         return new Player(px, py, ORIGIN_X, ORIGIN_Y);
     }
 
@@ -71,10 +72,10 @@ class PlayerTest {
     @Test
     void move_blockedByUnrevealedSquare() {
         Grid g = makeGrid();
-        // Place player at right edge of revealed region: center of cell (3,1)
-        // Cell (4,1) is unrevealed (wall)
-        double px = ORIGIN_X + 3 * 30 + 29; // right edge of cell (3,1)
-        double py = ORIGIN_Y + 1 * 30 + 15;
+        // Place player at top-left of cell (3,1). Sprite right edge = 3*30+30 = cell boundary.
+        // Moving right by 5 would push right edge into unrevealed cell (4,1).
+        double px = ORIGIN_X + 3 * SQ;
+        double py = ORIGIN_Y + 1 * SQ;
         Player p = new Player(px, py, ORIGIN_X, ORIGIN_Y);
         double beforeX = p.x;
         p.move(1, 0, g); // try to move right into unrevealed cell (4,1)
@@ -84,8 +85,7 @@ class PlayerTest {
     @Test
     void move_allowedOnRevealedSquare() {
         Grid g = makeGrid();
-        // Player in center of (1,1), moving right stays in revealed area
-        Player p = makePlayer();
+        Player p = makePlayer(); // at cell (1,1), moving right stays in revealed area
         double before = p.x;
         p.move(1, 0, g);
         assertNotEquals(before, p.x, "Player should move into revealed square");
@@ -108,7 +108,7 @@ class PlayerTest {
 
     @Test
     void canPlaceFlag_withinRadius_returnsTrue() {
-        Player p = makePlayer(); // at cell (1,1)
+        Player p = makePlayer(); // top-left at cell (1,1), center in cell (1,1)
         assertTrue(p.canPlaceFlag(2, 2), "1 cell diagonal should be in radius");
         assertTrue(p.canPlaceFlag(3, 1), "2 cells right should be in radius");
         assertTrue(p.canPlaceFlag(1, 3), "2 cells down should be in radius");
@@ -117,7 +117,7 @@ class PlayerTest {
 
     @Test
     void canPlaceFlag_outsideRadius_returnsFalse() {
-        Player p = makePlayer(); // at cell (1,1)
+        Player p = makePlayer(); // top-left at cell (1,1), center in cell (1,1)
         assertFalse(p.canPlaceFlag(4, 1), "3 cells right should be out of radius");
         assertFalse(p.canPlaceFlag(1, 4), "3 cells down should be out of radius");
         assertFalse(p.canPlaceFlag(4, 4), "3 cells diagonal should be out of radius");
@@ -125,7 +125,28 @@ class PlayerTest {
 
     @Test
     void canPlaceFlag_atPlayerSquare_returnsTrue() {
-        Player p = makePlayer(); // at cell (1,1)
+        Player p = makePlayer(); // top-left at cell (1,1)
         assertTrue(p.canPlaceFlag(1, 1), "Player's own cell should be in radius");
+    }
+
+    @Test
+    void move_blockedByLockedStair() {
+        Grid g = makeGrid();
+        // Cell (2,1) is revealed but has a locked stair
+        Square sq = g.matrix[2][1];
+        sq.isStairs = true;
+        sq.stairUnlocked = false;
+        // sq.removed is already true from makeGrid()
+
+        // Place player flush against right edge: top-left at cell boundary minus 1 pixel
+        // so sprite right edge just touches cell (2,1)
+        double px = ORIGIN_X + 2 * SQ - SQ; // = cell (1,1) top-left
+        double py = ORIGIN_Y + 1 * SQ;
+        Player p = new Player(px, py, ORIGIN_X, ORIGIN_Y);
+        // Sprite occupies exactly cell (1,1). Moving right by speed=5 would
+        // push right edge into cell (2,1) which is a locked stair.
+        double beforeX = p.x;
+        p.move(1, 0, g); // try to move right into locked stair
+        assertEquals(beforeX, p.x, "Player should be blocked by locked stair");
     }
 }

@@ -45,6 +45,7 @@ public class DungeonFloor {
     public final int liveRoomDepth;      // consecutive live small rooms since last big floor
     public final int keysNeeded;         // number of keys required to unlock stairs on this floor
     public final int floorId;            // unique ID for this floor instance
+    public final Player player;          // saved player position on this floor (null if not spawned)
 
     public DungeonFloor(Grid grid, Map<Long, Integer> subFloorDifficulty,
                         boolean generated, boolean playing,
@@ -52,7 +53,7 @@ public class DungeonFloor {
                         Map<Long, DungeonFloor> subFloorCache, long entryKey,
                         int floorDepth, boolean isDead, int deadEndDepth,
                         boolean newFloorPlaced, int liveRoomDepth,
-                        int keysNeeded, int floorId) {
+                        int keysNeeded, int floorId, Player player) {
         this.grid               = grid;
         this.subFloorDifficulty = subFloorDifficulty;
         this.generated          = generated;
@@ -68,5 +69,6 @@ public class DungeonFloor {
         this.liveRoomDepth      = liveRoomDepth;
         this.keysNeeded         = keysNeeded;
         this.floorId            = floorId;
+        this.player             = player;
     }
 }

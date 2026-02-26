@@ -34,6 +34,10 @@ public class Screen extends JPanel {
     private volatile boolean overlayClickActive = false;
     private volatile List<int[]> overlayZeroPositions = Collections.emptyList();
 
+    // Player sprite (dungeon mode)
+    private volatile Player paintPlayer = null;
+    private volatile boolean paintFlagMode = false;
+
     // Settings menu overlay
     private volatile boolean settingsActive = false;
     private volatile SettingsMenu settingsMenu = null;
@@ -100,7 +104,7 @@ public class Screen extends JPanel {
         bg.dispose();
     }
 
-    public void draw(boolean playing, Square exploded, boolean win) {
+    public void draw(boolean playing, Square exploded, boolean win, Player player, boolean flagMode) {
         if (win) {
             resetButton.image = images.won;
         } else if (!playing && exploded != null) {
@@ -111,6 +115,8 @@ public class Screen extends JPanel {
         this.paintPlaying = playing;
         this.paintExploded = exploded;
         this.paintWin = win;
+        this.paintPlayer = player;
+        this.paintFlagMode = flagMode;
         this.overlayClickActive = false;
         this.overlayZeroPositions = Collections.emptyList();
         repaint();
@@ -218,6 +224,18 @@ public class Screen extends JPanel {
             g2.drawLine(grid.originX, y, grid.originX + grid.W, y);
         }
         g2.setStroke(new java.awt.BasicStroke(1));
+
+        // Draw player sprite in dungeon mode
+        Player playerSnap = paintPlayer;
+        if (playerSnap != null && playing) {
+            boolean fm = paintFlagMode;
+            BufferedImage pImg;
+            if (playerSnap.facingDx > 0) pImg = fm ? images.playerRightFlag : images.playerRight;
+            else if (playerSnap.facingDx < 0) pImg = fm ? images.playerLeftFlag : images.playerLeft;
+            else if (playerSnap.facingDy < 0) pImg = fm ? images.playerUpFlag : images.playerUp;
+            else pImg = fm ? images.playerDownFlag : images.playerDown;
+            g2.drawImage(pImg, (int) playerSnap.x, (int) playerSnap.y, null);
+        }
 
         for (int[] pos : zeroPositions) {
             g2.drawImage(images.zero, pos[0], pos[1], null);

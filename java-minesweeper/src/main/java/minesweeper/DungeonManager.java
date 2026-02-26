@@ -70,7 +70,7 @@ public class DungeonManager {
                 new HashMap<>(state.currentSubFloorCache), key,
                 state.dungeonFloorDepth, state.currentFloorIsDead, state.deadEndDepth,
                 parentNewFloorPlaced, parentLiveRoomDepth,
-                state.keysNeeded, state.currentFloorId));
+                state.keysNeeded, state.currentFloorId, state.player));
 
         if (savedChild != null) {
             state.grid = savedChild.grid;
@@ -87,6 +87,7 @@ public class DungeonManager {
             state.liveRoomDepth = savedChild.liveRoomDepth;
             state.keysNeeded = savedChild.keysNeeded;
             state.currentFloorId = savedChild.floorId;
+            state.player = savedChild.player;
             String pathStatus;
             if (state.currentFloorIsDead) {
                 pathStatus = "DEAD END";
@@ -150,6 +151,7 @@ public class DungeonManager {
             state.subFloorDifficulty = new HashMap<>();
             state.currentSubFloorCache = new HashMap<>();
             state.keysNeeded = 0;
+            state.player = null;
             state.playing = true;
             state.generated = false;
             state.exploded = null;
@@ -165,7 +167,7 @@ public class DungeonManager {
                 new HashMap<>(state.currentSubFloorCache), -1,
                 state.dungeonFloorDepth, state.currentFloorIsDead, state.deadEndDepth,
                 state.newFloorPlaced, state.liveRoomDepth,
-                state.keysNeeded, state.currentFloorId);
+                state.keysNeeded, state.currentFloorId, state.player);
 
         DungeonFloor parentFrame = state.dungeonStack.pop();
 
@@ -188,6 +190,16 @@ public class DungeonManager {
         state.liveRoomDepth = parentFrame.liveRoomDepth;
         state.keysNeeded = parentFrame.keysNeeded;
         state.currentFloorId = parentFrame.floorId;
+        state.player = parentFrame.player;
+
+        // Reposition player onto the entry stair they descended from
+        if (state.player != null && parentFrame.entryKey != -1) {
+            int stairCol = (int) (parentFrame.entryKey / 10000);
+            int stairRow = (int) (parentFrame.entryKey % 10000);
+            Square stairSq = state.grid.matrix[stairCol][stairRow];
+            state.player.x = stairSq.x;
+            state.player.y = stairSq.y;
+        }
 
         boolean childFoundNewFloor = childSnapshot.subFloorDifficulty.containsValue(9)
                 || childSnapshot.newFloorPlaced;
